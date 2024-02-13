@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 void main() {
-  runApp(const MyApp());
-}
-
-class Task {
-  Task(this.title, this.checked);
-
-  final String title;
-  final bool checked;
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => TasksModel(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatefulWidget {
@@ -19,14 +18,13 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  final tasks = [
-    Task('First Task', false),
-    Task('Second Task', false),
-    Task('Third Task', false),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final model = Provider.of<TasksModel>(context);
+    final completedTasks = model.completedTasks;
+    final tasks = model.tasks;
+    final progress = completedTasks.length / tasks.length;
+
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
@@ -34,18 +32,12 @@ class _MyAppState extends State<MyApp> {
         ),
         body: ListView(
           children: [
-            const LinearProgressIndicator(
-              value: 0.4,
+            LinearProgressIndicator(
+              value: progress,
             ),
-            ...tasks.map(
-              (task) => MyCheckboxTile(
-                title: task.title,
-                checked: task.checked,
-                onChange: (newValue) {
-
-                },
-              ),
-            ),
+            TasksList(onChanged: (newValue, title) {
+                model.toggleTask(title);
+            })
           ],
         ),
       ),
@@ -53,29 +45,50 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-class MyCheckboxTile extends StatefulWidget {
-  const MyCheckboxTile({
+class TasksList extends StatelessWidget {
+  const TasksList({
     super.key,
-    required this.title,
-    required this.checked,
-    required this.onChange,
+    required this.onChanged,
   });
 
-  final String title;
-  final bool checked;
-  final void Function(bool?) onChange;
+  final void Function(bool, String) onChanged;
 
-  @override
-  State<MyCheckboxTile> createState() => _MyCheckboxTileState();
-}
-
-class _MyCheckboxTileState extends State<MyCheckboxTile> {
   @override
   Widget build(BuildContext context) {
-    return CheckboxListTile(
-      title: Text(widget.title),
-      value: widget.checked,
-      onChanged: widget.onChange,
+    final model = context.watch<TasksModel>();
+    final List<String> tasks = model.tasks;
+    final List<String> completedTasks = model.completedTasks;
+
+    return Column(
+      children: tasks
+          .map(
+            (title) => CheckboxListTile(
+              title: Text(title),
+              value: completedTasks.contains(title),
+              onChanged: (checked) => onChanged(checked ?? false, title),
+            ),
+          )
+          .toList(),
     );
+  }
+}
+
+class TasksModel extends ChangeNotifier {
+  final List<String> tasks = [
+    'First Task',
+    'Second Task',
+    'Third Task',
+  ];
+  final List<String> completedTasks = [];
+
+  TasksModel();
+
+  void toggleTask(String title) {
+    if (completedTasks.contains(title)) {
+      completedTasks.remove(title);
+    } else {
+      completedTasks.add(title);
+    }
+    notifyListeners();
   }
 }
