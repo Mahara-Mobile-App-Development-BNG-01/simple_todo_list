@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
 
 void main() {
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => TasksModel(),
+    BlocProvider<TasksCubit>(
+      create: (context) => TasksCubit(),
       child: const MyApp(),
     ),
   );
@@ -18,11 +19,13 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  final textController = TextEditingController();
+
   @override
   Widget build(BuildContext context) {
-    final model = Provider.of<TasksModel>(context);
-    final completedTasks = model.completedTasks;
-    final tasks = model.tasks;
+    final cubit = context.watch<TasksCubit>();
+    final completedTasks = cubit.state.completedTasks;
+    final tasks = cubit.state.tasks;
     final progress = completedTasks.length / tasks.length;
 
     return MaterialApp(
@@ -32,11 +35,24 @@ class _MyAppState extends State<MyApp> {
         ),
         body: ListView(
           children: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TextField(
+                controller: textController,
+                decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: 'Enter your task here'),
+                onSubmitted: (text) {
+                  cubit.addTask(text);
+                  textController.clear();
+                },
+              ),
+            ),
             LinearProgressIndicator(
               value: progress,
             ),
             TasksList(onChanged: (newValue, title) {
-                model.toggleTask(title);
+              cubit.toggleTask(title);
             })
           ],
         ),
@@ -55,9 +71,9 @@ class TasksList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final model = context.watch<TasksModel>();
-    final List<String> tasks = model.tasks;
-    final List<String> completedTasks = model.completedTasks;
+    final model = context.watch<TasksCubit>();
+    final List<String> tasks = model.state.tasks;
+    final List<String> completedTasks = model.state.completedTasks;
 
     return Column(
       children: tasks
@@ -73,22 +89,52 @@ class TasksList extends StatelessWidget {
   }
 }
 
-class TasksModel extends ChangeNotifier {
-  final List<String> tasks = [
-    'First Task',
-    'Second Task',
-    'Third Task',
-  ];
-  final List<String> completedTasks = [];
+class TasksCubit extends Cubit<TasksState> {
+  TasksCubit()
+      : super(
+          TasksState(
+            tasks: ['First Task', 'Second Task', 'Third Task'],
+            completedTasks: [],
+          ),
+        );
 
-  TasksModel();
+  void addTask(String title) {
+    emit(
+      state.copyWith(
+        tasks: [
+          title,
+          ...state.tasks,
+        ],
+      ),
+    );
+  }
 
   void toggleTask(String title) {
-    if (completedTasks.contains(title)) {
-      completedTasks.remove(title);
+    final newState = state.copyWith();
+
+    if (state.completedTasks.contains(title)) {
+      newState.completedTasks.remove(title);
+      emit(newState);
     } else {
-      completedTasks.add(title);
+      newState.completedTasks.add(title);
+      emit(newState);
     }
-    notifyListeners();
+  }
+}
+
+class TasksState {
+  TasksState({required this.tasks, required this.completedTasks});
+
+  final List<String> tasks;
+  final List<String> completedTasks;
+
+  TasksState copyWith({
+    List<String>? tasks,
+    List<String>? completedTasks,
+  }) {
+    return TasksState(
+      tasks: tasks ?? this.tasks,
+      completedTasks: completedTasks ?? this.completedTasks,
+    );
   }
 }
